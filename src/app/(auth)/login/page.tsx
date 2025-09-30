@@ -11,24 +11,35 @@ export default function LoginPage() {
 	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
 	const handleSubmit = useCallback(async (event: React.FormEvent) => {
 		event.preventDefault();
 		setLoading(true);
 		setErrorMessage(null);
+		setInfoMessage(null);
 		try {
 			const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
 				email,
 				password,
 			});
-			if (signInError) {
-				// Fallback to sign up if user does not exist
-				const { error: signUpError } = await supabase.auth.signUp({ email, password });
-				if (signUpError) {
-					throw signUpError;
-				}
+			if (!signInError) {
+				router.replace("/dashboard");
+				return;
 			}
-			router.replace("/dashboard");
+
+			// Fallback to sign up if user does not exist
+			const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+			if (signUpError) {
+				throw signUpError;
+			}
+
+			// If email confirmations are enabled, Supabase returns no session and sends a confirmation email
+			if (signUpData?.session) {
+				router.replace("/dashboard");
+			} else {
+				setInfoMessage("Account created. Please check your email to confirm, then sign in.");
+			}
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : "Authentication failed";
 			setErrorMessage(message);
@@ -73,6 +84,9 @@ export default function LoginPage() {
 						>
 							{loading ? "Working..." : "Sign In"}
 						</button>
+						{infoMessage ? (
+							<p className="text-sm text-emerald-600">{infoMessage}</p>
+						) : null}
 						{errorMessage ? (
 							<p className="text-sm text-rose-500">{errorMessage}</p>
 						) : null}
